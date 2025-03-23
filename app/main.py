@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette import status
-from utils import Database, db_to_string, taking_period_calculation, check_period, next_pill
+from utils import Database, taking_period_calculation, check_period, next_pill
 
 # start of application and database/ запуск приложения и БД
 app = FastAPI()  # uvicorn app.main:app
@@ -71,10 +71,10 @@ async def get_schedules_by_user_id(user_id):
 @app.get('/schedule')
 async def get_schedule_by_schedule_id(user_id, schedule_id):
     # DB query/ запрос в БД
-    schedule = list(db.get_user_schedule(user_id, schedule_id))
+    schedule = db.get_user_schedule(user_id, schedule_id)
     # if there is an answer, then it displays, otherwise error 404/ если ответ есть, то выдаёт, иначе ошибка 404
     if len(schedule):
-            return schedule
+        return schedule
     else:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -92,9 +92,11 @@ async def get_next_taking(user_id):
     for i in schedules_ids:
         # we get the value from the DB and process it/ получаем значение из БД и обрабатываем
         db_req = db.get_user_schedule(user_id, i)
-        pill = list(db_req[0])
+        pill = db_req[0]
+
         # we get the closest one in a given period/ получаем ближайшую в заданный период
         next_pill_time = check_period(pill[1])
+
         # if it exists, then we add it to the list, otherwise we look for the closest one that
         # is not related to the period/
         # если она существует, то добавляем в список, иначе ищем ближайшую не относящуюся к периоду
@@ -102,16 +104,15 @@ async def get_next_taking(user_id):
             pills_in_period.append([pill[0], next_pill_time])
         else:
             next_pill_time = next_pill(pill[1])
-
         # updating schedule for the next 4 days/ обновляем расписание для следующих 4 дней
-        new_schedule = taking_period_calculation(db_req[2:], next_pill_time.split("::"))
-        delta = int(new_schedule[0][:2]) - int(pill[1][0][:2])
+        new_schedule = taking_period_calculation([pill[2], pill[3]], next_pill_time)
+        delta = int(new_schedule[0].split("::")[1][:2]) - int(pill[1].split(" ")[0].split("::")[1][:2])
         # update remaining appointment time/ обновление оставшегося время приёма
         duration = pill[2]
         if duration > 0:
             duration -= delta
         # update row in DB/ обновление строки в БД
-        db.update_schedule(pill[0], new_schedule, duration)
+        db.update_schedule(i, " ".join(new_schedule), duration)
     if len(pills_in_period):
         return pills_in_period
     else:

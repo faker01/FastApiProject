@@ -3,45 +3,53 @@ import time
 from os import remove as os_remove
 from data.settings import period
 
-
+# list with number of days in months for correct calculation/
+# список с количеством дней в месяцах для правильного рассчёта
 months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
+# function of finding the nearest pill in a given period/ функция нахождения ближайшей таблетки в заданный период
 def check_period(schedule):
+    # get current date and current time/ получение текущей даты и текущего времени
     now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     schedule = schedule.split(" ")
+    # we go through the list with dates and times of reception and search by the specified parameters/
+    # проходим по списку с датами и временами приёма и ищем по заданным параметрам
     for i in schedule:
         schedule_date, schedule_time = i.split("::")
         if schedule_date == now_date and now_time < schedule_time:
             if schedule_time < time_sum(now_time, period):
-                return schedule_time
+                return f"{schedule_date}::{schedule_time}"
             return False
     return False
 
 
+# function of getting the next pill if the previous function did not work/
+# функция получения следующей таблетки, если не сработала предыдущая функция
 def next_pill(schedule):
     now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     schedule = schedule.split(" ")
     for i in schedule:
         schedule_date, schedule_time = i.split("::")
         if (schedule_date == now_date and now_time < schedule_time) or schedule_date > now_date:
-            return schedule_time
+            return f"{schedule_date}::{schedule_time}"
     return False
 
 
-def db_to_string(req):
-    return f"""for user: {req[0]} {req[1]} {req[2]} {req[3]}"""
-
-
+# function to sum date and number of days/ функция суммирования даты и количества дней
 def date_sum(date: str, date_period: int):
     day, month, year = map(int, date.split("."))
     day += date_period
     while months[month] < day:
         day -= months[month]
         month += 1
+        if month > 12:
+            month -= 12
+            year += 1
     return f"{day}.{month}.{year}"
 
 
+# time and hours summation function/ функция суммирования времени и часов
 def time_sum(n_time: str, time_period: int):
     hour, minute = map(int, n_time.split("."))
     minute += time_period * 60
@@ -54,25 +62,29 @@ def time_sum(n_time: str, time_period: int):
             minute += 60
             hour -= 1
     if hour < 10:
-        return f"0{hour}.{minute}"
-    return f"{hour}.{minute}"
+        return f"0{hour}.{minute}".ljust(5, "0")
+    return f"{hour}.{minute}".ljust(5, "0")
 
 
-def taking_period_calculation(req: list, now_dt: list):
+# function to calculate schedule for the next 4 days/ функция рассчёта расписания для следующих 4 дней
+def taking_period_calculation(req: list, now_dt: str = ""):
+    # we get the initial time, duration and period/ получаем начальное время, длительность и периодичность
     schedule = []
     if len(now_dt) > 0:
-        now_date, now_time = now_dt
+        now_date, now_time = now_dt.split("::")
     else:
         now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     if len(now_time) < 5:
         now_time = "0" + now_time
     taking_duration, taking_period = req
 
+    # we check that the time is a multiple of 15/ проверяем, чтобы время было кратно 15
     time_check = list(map(int, now_time.split(".")))[1]
     while time_check % 15 != 0:
         time_check += 1
-    now_time = now_time[:3] + str(time_check)
+    now_time = time_sum(now_time[:3] + str(time_check), 0)
 
+    # get settlement end date/ получаем дату окончания рассчётов
     if 0 < taking_duration < 4:
         end_date = date_sum(now_date, taking_duration)
     elif taking_duration == 0:
@@ -80,6 +92,8 @@ def taking_period_calculation(req: list, now_dt: list):
     else:
         end_date = date_sum(now_date, 4)
 
+    # we calculate each reception in a given period, checking that it falls during daytime/
+    # рассчитываем каждый приём в заданном периоде, проверяя, что он попадает в дневное время
     while now_date < end_date:
         now_time = time_sum(now_time, taking_period)
         if int(now_time[:2]) > 24:
@@ -92,8 +106,9 @@ def taking_period_calculation(req: list, now_dt: list):
             schedule.append(f"{now_date}::08.00")
         else:
             schedule.append(f"{date_sum(now_date, 1)}::08.00")
-        
+
     return schedule
+
 
 class Database:
     # initializing class for work with db/ инициализация класса для работы с бд
@@ -151,9 +166,8 @@ class Database:
         self.cur.execute(f'''SELECT id FROM Schedule WHERE user_id = {schedule[0]}''')
         return self.cur.fetchall()[-1]
 
-    def update_schedule(self, schedule_id, schedule, duration):
-        self.cur.execute(f'''UPDATE INTO Schedule(schedule, duration) 
-                                VALUES ("{schedule}", "{duration}") WHERE id={schedule_id}''')
+    def update_schedule(self, schedule_id: int, schedule: str, duration: int):
+        self.cur.execute(f'''UPDATE Schedule SET schedule="{schedule}", duration={duration} WHERE id={schedule_id}''')
         self.con.commit()
         return self.cur.fetchall()
 

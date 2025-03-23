@@ -19,9 +19,9 @@ class Schedule_request(BaseModel):
     period: int
 
 
-@app.post('/schedule', response_model=Schedule_request)
-async def post_schedule(data=Body()):
-    new_schedule = Schedule_request(data["user_id"], data["pill"], data["duration"], data["period"])
+@app.post('/schedule', response_model=Schedule_response)
+async def post_schedule(schedule: Schedule_request):
+    new_schedule = [schedule.user_id, schedule.pill, schedule.duration, schedule.period]
     pill_schedule = ' '.join(taking_period_calculation(new_schedule[2:]))
     if new_schedule[2] > 0:
         if new_schedule[2] < 4:
@@ -30,12 +30,12 @@ async def post_schedule(data=Body()):
             new_schedule[2] -= 4
 
     new_schedule = [new_schedule[0], new_schedule[1], pill_schedule, new_schedule[2], new_schedule[3]]
-    req = db.add_schedule(new_schedule)
+    req = list(db.add_schedule(new_schedule))
 
     if req:
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
-            content={"message": "Успешно добавлен"}
+            content={"message": f"Успешно добавлен, Schedule_id={req[0]}"}
         )
     else:
         return JSONResponse(
@@ -76,7 +76,7 @@ async def get_next_taking(user_id):
     pills_in_period = []
 
     for i in schedules_ids:
-        pill = list(db.get_user_schedule(user_id, i))
+        pill = list(db.get_user_schedule(user_id, i)[0])
         print(pill)
         next_pill_time = check_period(pill[1])
         if next_pill_time:

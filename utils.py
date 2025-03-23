@@ -7,14 +7,19 @@ from data.settings import period
 months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
+def update_taking_period()
+
+
 def check_period(schedule):
     now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     schedule = schedule.split(" ")
     for i in schedule:
-        print(i)
         schedule_date, schedule_time = i.split("::")
-        if schedule_date == now_date and now_time < schedule_time < time_sum(schedule_time, period):
-            return schedule_time
+        if schedule_date == now_date and now_time < schedule_time:
+            if schedule_time < time_sum(now_time, period):
+
+                return schedule_time
+
     return False
 
 def db_to_string(req):
@@ -126,14 +131,21 @@ class Database:
     def add_user(self, name: str):
         self.cur.execute(f'''INSERT INTO Users(username) VALUES ("{name}")''')
         self.con.commit()
-        return self.cur.fetchone()
+        return self.cur.fetchall()
 
     # function to add schedule for user / функция добавления расписания для пользователя
     def add_schedule(self, schedule: list):
         self.cur.execute(f'''INSERT INTO Schedule(user_id, pill, schedule, duration, period) 
                         VALUES ({schedule[0]}, "{schedule[1]}", "{schedule[2]}", {schedule[3]}, {schedule[4]})''')
         self.con.commit()
-        return self.cur.fetchone()
+        self.cur.execute(f'''SELECT id FROM Schedule WHERE user_id = {schedule[0]}''')
+        return self.cur.fetchall()[-1]
+
+    def update_schedule(self, schedule_id, schedule, duration):
+        self.cur.execute(f'''UPDATE INTO Schedule(schedule, duration) 
+                                VALUES ("{schedule}", "{duration}") WHERE id={schedule_id}''')
+        self.con.commit()
+        return self.cur.fetchall()
 
 
 """db = Database()

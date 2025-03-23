@@ -7,9 +7,6 @@ from data.settings import period
 months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
-def update_taking_period()
-
-
 def check_period(schedule):
     now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     schedule = schedule.split(" ")
@@ -17,10 +14,20 @@ def check_period(schedule):
         schedule_date, schedule_time = i.split("::")
         if schedule_date == now_date and now_time < schedule_time:
             if schedule_time < time_sum(now_time, period):
-
                 return schedule_time
-
+            return False
     return False
+
+
+def next_pill(schedule):
+    now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
+    schedule = schedule.split(" ")
+    for i in schedule:
+        schedule_date, schedule_time = i.split("::")
+        if (schedule_date == now_date and now_time < schedule_time) or schedule_date > now_date:
+            return schedule_time
+    return False
+
 
 def db_to_string(req):
     return f"""for user: {req[0]} {req[1]} {req[2]} {req[3]}"""
@@ -51,9 +58,12 @@ def time_sum(n_time: str, time_period: int):
     return f"{hour}.{minute}"
 
 
-def taking_period_calculation(req):
+def taking_period_calculation(req: list, now_dt: list):
     schedule = []
-    now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
+    if len(now_dt) > 0:
+        now_date, now_time = now_dt
+    else:
+        now_date, now_time = time.strftime("%d.%m.%Y::%H.%M", time.localtime(time.time())).split("::")
     if len(now_time) < 5:
         now_time = "0" + now_time
     taking_duration, taking_period = req
